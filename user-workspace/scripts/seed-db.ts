@@ -1,111 +1,87 @@
-import db from '../src/lib/db'
+import { PrismaClient } from '@prisma/client'
 
-async function seed() {
-  try {
-    await db.connect()
-    console.log('Connected to MongoDB')
+const prisma = new PrismaClient()
 
-    // Create categories
-    const categories = await Promise.all([
-      db.categories.create({
-        name: 'Parfum Pria',
-      }),
-      db.categories.create({
-        name: 'Parfum Wanita',
-      }),
-      db.categories.create({
-        name: 'Parfum Unisex',
-      }),
-    ])
-    console.log('Categories created:', categories)
+async function main() {
+  // Clear existing data
+  await prisma.sale.deleteMany()
+  await prisma.product.deleteMany()
+  await prisma.category.deleteMany()
 
-    // Create products
-    const products = await Promise.all([
-      db.products.create({
-        name: 'Blue de Chanel',
-        description: 'Aroma woody dan citrus yang maskulin',
-        price: 1500000,
-        stock: 50,
-        categoryId: categories[0].id,
-      }),
-      db.products.create({
-        name: 'Miss Dior',
-        description: 'Aroma floral yang feminin dan elegan',
-        price: 1800000,
-        stock: 40,
-        categoryId: categories[1].id,
-      }),
-      db.products.create({
-        name: 'CK One',
-        description: 'Aroma segar dan ringan untuk semua gender',
-        price: 1200000,
-        stock: 60,
-        categoryId: categories[2].id,
-      }),
-      db.products.create({
-        name: 'Acqua di Gio',
-        description: 'Aroma aquatic yang segar dan maskulin',
-        price: 1600000,
-        stock: 45,
-        categoryId: categories[0].id,
-      }),
-      db.products.create({
-        name: 'La Vie Est Belle',
-        description: 'Aroma manis dan hangat yang mempesona',
-        price: 1700000,
-        stock: 35,
-        categoryId: categories[1].id,
-      }),
-    ])
-    console.log('Products created:', products)
+  // Create categories
+  const parfumPria = await prisma.category.create({
+    data: { name: 'Parfum Pria' },
+  })
+  const parfumWanita = await prisma.category.create({
+    data: { name: 'Parfum Wanita' },
+  })
+  const parfumUnisex = await prisma.category.create({
+    data: { name: 'Parfum Unisex' },
+  })
 
-    // Create sample sales
-    const today = new Date()
-    const yesterday = new Date(today)
-    yesterday.setDate(yesterday.getDate() - 1)
-    const twoDaysAgo = new Date(today)
-    twoDaysAgo.setDate(twoDaysAgo.getDate() - 2)
+  // Create products
+  const blueDeChanel = await prisma.product.create({
+    data: {
+      name: 'Blue de Chanel',
+      description: 'Aroma woody dan citrus yang maskulin',
+      price: 1500000,
+      stock: 50,
+      categoryId: parfumPria.id,
+    },
+  })
 
-    const sales = await Promise.all([
-      db.sales.create({
-        productId: products[0].id,
+  const missDior = await prisma.product.create({
+    data: {
+      name: 'Miss Dior',
+      description: 'Aroma floral yang feminin dan elegan',
+      price: 1800000,
+      stock: 40,
+      categoryId: parfumWanita.id,
+    },
+  })
+
+  const ckOne = await prisma.product.create({
+    data: {
+      name: 'CK One',
+      description: 'Aroma segar dan ringan untuk semua gender',
+      price: 1200000,
+      stock: 60,
+      categoryId: parfumUnisex.id,
+    },
+  })
+
+  // Create sales
+  await prisma.sale.createMany({
+    data: [
+      {
+        productId: blueDeChanel.id,
         quantity: 2,
-        total: products[0].price * 2,
-        date: today,
-      }),
-      db.sales.create({
-        productId: products[1].id,
+        total: blueDeChanel.price * 2,
+        date: new Date(),
+      },
+      {
+        productId: missDior.id,
         quantity: 1,
-        total: products[1].price,
-        date: today,
-      }),
-      db.sales.create({
-        productId: products[2].id,
+        total: missDior.price,
+        date: new Date(),
+      },
+      {
+        productId: ckOne.id,
         quantity: 3,
-        total: products[2].price * 3,
-        date: yesterday,
-      }),
-      db.sales.create({
-        productId: products[3].id,
-        quantity: 2,
-        total: products[3].price * 2,
-        date: yesterday,
-      }),
-      db.sales.create({
-        productId: products[4].id,
-        quantity: 1,
-        total: products[4].price,
-        date: twoDaysAgo,
-      }),
-    ])
-    console.log('Sales created:', sales)
+        total: ckOne.price * 3,
+        date: new Date(),
+      },
+    ],
+  })
 
-    console.log('Database seeded successfully!')
-  } catch (error) {
-    console.error('Error seeding database:', error)
-  } finally {
-    process.exit(0)
-  }
+  console.log('Sample data seeded successfully.')
 }
 
-seed()
+main()
+  .catch((e) => {
+    console.error(e)
+    process.exit(1)
+  })
+  .finally(async () => {
+    await prisma.$disconnect()
+  })
