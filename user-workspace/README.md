@@ -1,36 +1,86 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Sistem Manajemen Parfum
 
-## Getting Started
+## Database Setup
 
-First, run the development server:
+1. Install MySQL on your system if you haven't already.
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+2. Create a new MySQL database:
+```sql
+CREATE DATABASE mydatabase;
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+3. Update the `.env` file with your MySQL credentials:
+```env
+DATABASE_URL="mysql://username:password@localhost:3306/mydatabase"
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+4. Install dependencies:
+```bash
+npm install
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+5. Generate Prisma Client:
+```bash
+npm run db:generate
+```
 
-## Learn More
+6. Push the database schema:
+```bash
+npm run db:push
+```
 
-To learn more about Next.js, take a look at the following resources:
+7. Initialize the database with sample data:
+```bash
+npm run db:init
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+8. (Optional) Open Prisma Studio to view and edit data:
+```bash
+npm run db:studio
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Database Schema
 
-## Deploy on Vercel
+The application uses the following models:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+- **Product**: Stores perfume product information
+  - id, name, description, price, stock, categoryId
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- **Category**: Product categories
+  - id, name
+
+- **Sale**: Records of product sales
+  - id, quantity, total, productId, date
+
+- **Inventory**: Product stock management
+  - id, quantity, productId
+
+- **User**: User management
+  - id, email, name, password, role
+
+## API Routes
+
+### Products
+
+- `GET /api/products`: Get all products
+- `POST /api/products`: Create a new product
+
+Example POST request:
+```json
+{
+  "name": "New Perfume",
+  "description": "A fresh fragrance",
+  "price": 1000000,
+  "stock": 10,
+  "categoryId": 1
+}
+```
+
+## Development
+
+Run the development server:
+```bash
+npm run dev
+```
+
+The application will be available at http://localhost:8000
