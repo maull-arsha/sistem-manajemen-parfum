@@ -1,74 +1,74 @@
 "use client"
 
-import ChartComponent from "@/components/ui/chart-component"
-import { generateSalesChartData } from "@/lib/chart-utils"
+import React from "react"
+import { Card } from "@/components/ui/card"
+import { Sale } from "@/types"
+import { formatRupiah } from "@/lib/utils"
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts"
 
-// Dummy data untuk contoh
-const dummySalesData = [
-  {
-    date: "2024-01-01",
-    total: 2500000,
-    profit: 1250000,
-  },
-  {
-    date: "2024-01-02",
-    total: 3000000,
-    profit: 1500000,
-  },
-  {
-    date: "2024-01-03",
-    total: 2800000,
-    profit: 1400000,
-  },
-  {
-    date: "2024-01-04",
-    total: 3200000,
-    profit: 1600000,
-  },
-  {
-    date: "2024-01-05",
-    total: 2900000,
-    profit: 1450000,
-  },
-]
+interface SalesChartProps {
+  sales: Sale[]
+}
 
-export default function SalesChart() {
-  const chartData = generateSalesChartData(dummySalesData)
+export default function SalesChart({ sales }: SalesChartProps) {
+  // Process sales data for the chart
+  const dailySales = sales.reduce((acc: { [key: string]: number }, sale) => {
+    const date = new Date(sale.date).toLocaleDateString()
+    acc[date] = (acc[date] || 0) + sale.total
+    return acc
+  }, {})
 
-  const options = {
-    responsive: true,
-    plugins: {
-      legend: {
-        position: 'bottom' as const,
-      },
-      title: {
-        display: true,
-        text: 'Grafik Penjualan dan Profit',
-      },
-    },
-    scales: {
-      y: {
-        beginAtZero: true,
-        ticks: {
-          callback: function(value: any) {
-            return new Intl.NumberFormat('id-ID', {
-              style: 'currency',
-              currency: 'IDR',
-              minimumFractionDigits: 0,
-              maximumFractionDigits: 0,
-            }).format(value);
-          }
-        }
-      }
-    }
-  }
+  const chartData = Object.entries(dailySales)
+    .map(([date, total]) => ({
+      date,
+      total,
+    }))
+    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+    .slice(-30) // Last 30 days
 
   return (
-    <ChartComponent
-      type="line"
-      data={chartData}
-      options={options}
-      height={300}
-    />
+    <Card className="p-4">
+      <h3 className="text-lg font-semibold mb-4">Sales Trend (Last 30 Days)</h3>
+      <div className="h-[300px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={chartData}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis
+              dataKey="date"
+              tick={{ fontSize: 12 }}
+              tickFormatter={(value) => new Date(value).toLocaleDateString("id-ID", { day: "2-digit", month: "short" })}
+            />
+            <YAxis
+              tick={{ fontSize: 12 }}
+              tickFormatter={(value) => formatRupiah(value).split(",")[0]}
+            />
+            <Tooltip
+              formatter={(value: number) => [formatRupiah(value), "Total Sales"]}
+              labelFormatter={(label) => new Date(label).toLocaleDateString("id-ID", { 
+                weekday: "long",
+                year: "numeric",
+                month: "long",
+                day: "numeric"
+              })}
+            />
+            <Line
+              type="monotone"
+              dataKey="total"
+              stroke="#2563eb"
+              strokeWidth={2}
+              dot={false}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    </Card>
   )
 }

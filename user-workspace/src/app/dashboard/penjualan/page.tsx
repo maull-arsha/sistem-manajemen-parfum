@@ -1,166 +1,220 @@
 "use client"
 
-import { useState } from "react"
+import React, { useEffect, useState } from "react"
+import { Sale, Product, SaleAnalytics } from "@/types"
 import { Card } from "@/components/ui/card"
+import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { formatRupiah } from "@/lib/product-utils"
+import { Label } from "@/components/ui/label"
+import { formatRupiah } from "@/lib/utils"
 import SalesChart from "./SalesChart"
 import ProductPerformanceChart from "./ProductPerformanceChart"
 
-// Dummy data untuk contoh
-const dummySales = [
-  {
-    id: 1,
-    date: "2024-01-15",
-    productName: "Parfum A",
-    quantity: 5,
-    price: 300000,
-    total: 1500000,
-    profit: 750000,
-  },
-  {
-    id: 2,
-    date: "2024-01-16",
-    productName: "Parfum B",
-    quantity: 3,
-    price: 500000,
-    total: 1500000,
-    profit: 750000,
-  },
-]
+export default function SalesDashboard() {
+  const [sales, setSales] = useState<Sale[]>([])
+  const [products, setProducts] = useState<Product[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [analytics, setAnalytics] = useState<SaleAnalytics | null>(null)
+  const [selectedProduct, setSelectedProduct] = useState<string>("")
+  const [quantity, setQuantity] = useState<string>("")
 
-export default function SalesPage() {
-  const [period, setPeriod] = useState("this-month")
-  const [sales] = useState(dummySales)
+  const fetchSales = async () => {
+    try {
+      const res = await fetch("/api/sales")
+      if (!res.ok) throw new Error("Failed to fetch sales")
+      const data = await res.json()
+      setSales(data)
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
 
-  // Calculate summary data
-  const totalSales = sales.reduce((acc, curr) => acc + curr.total, 0)
-  const totalProfit = sales.reduce((acc, curr) => acc + curr.profit, 0)
-  const totalQuantity = sales.reduce((acc, curr) => acc + curr.quantity, 0)
-  const averageOrderValue = totalSales / sales.length || 0
+  const fetchProducts = async () => {
+    try {
+      const res = await fetch("/api/products")
+      if (!res.ok) throw new Error("Failed to fetch products")
+      const data = await res.json()
+      setProducts(data)
+    } catch (err: any) {
+      setError(err.message)
+    }
+  }
+
+  const fetchAnalytics = async () => {
+    try {
+      const endDate = new Date()
+      const startDate = new Date()
+      startDate.setMonth(startDate.getMonth() - 1) // Last 30 days
+
+      const res = await fetch(
+        `/api/sales?startDate=${startDate.toISOString()}&endDate=${endDate.toISOString()}`
+      )
+      if (!res.ok) throw new Error("Failed to fetch analytics")
+      const data = await res.json()
+      setAnalytics(data[0])
+    } catch (err: any) {
+      setError(err.message)
+    }
+  }
+
+  useEffect(() => {
+    fetchSales()
+    fetchProducts()
+    fetchAnalytics()
+  }, [])
+
+  const handleCreateSale = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedProduct || !quantity) return
+
+    const product = products.find((p) => p.id.toString() === selectedProduct)
+    if (!product) return
+
+    try {
+      const res = await fetch("/api/sales", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          productId: parseInt(selectedProduct),
+          quantity: parseInt(quantity),
+          price: product.price,
+        }),
+      })
+
+      if (!res.ok) throw new Error("Failed to create sale")
+
+      setSelectedProduct("")
+      setQuantity("")
+      await Promise.all([fetchSales(), fetchAnalytics()])
+    } catch (err: any) {
+      setError(err.message)
+    }
+  }
+
+  const handleDeleteSale = async (id: number) => {
+    if (!confirm("Are you sure you want to delete this sale?")) return
+
+    try {
+      const res = await fetch(`/api/sales?id=${id}`, {
+        method: "DELETE",
+      })
+
+      if (!res.ok) throw new Error("Failed to delete sale")
+
+      await Promise.all([fetchSales(), fetchAnalytics()])
+    } catch (err: any) {
+      setError(err.message)
+    }
+  }
+
+  if (loading) return <div>Loading...</div>
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Rekap Penjualan</h2>
-        <div className="flex items-center gap-4">
-          <Select value={period} onValueChange={setPeriod}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Pilih Periode" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="today">Hari Ini</SelectItem>
-              <SelectItem value="this-week">Minggu Ini</SelectItem>
-              <SelectItem value="this-month">Bulan Ini</SelectItem>
-              <SelectItem value="this-year">Tahun Ini</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button>
-            Export Data
-          </Button>
-        </div>
+    <div className="p-4">
+      <h1 className="text-2xl font-bold mb-4">Sales Dashboard</h1>
+      {error && <div className="text-red-600 mb-4">{error}</div>}
+
+      {/* Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+        <SalesChart sales={sales} />
+        <ProductPerformanceChart sales={sales} />
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="p-6">
-          <h3 className="text-sm font-medium text-gray-500">Total Penjualan</h3>
-          <p className="text-2xl font-bold mt-2">{formatRupiah(totalSales)}</p>
-          <p className="text-sm text-gray-600 mt-1">Periode: {period}</p>
+      {/* Analytics Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <Card className="p-4">
+          <h3 className="text-sm font-medium text-gray-500">Total Sales (30d)</h3>
+          <p className="text-2xl font-bold">{formatRupiah(analytics?.totalSales || 0)}</p>
         </Card>
-
-        <Card className="p-6">
-          <h3 className="text-sm font-medium text-gray-500">Total Profit</h3>
-          <p className="text-2xl font-bold mt-2">{formatRupiah(totalProfit)}</p>
-          <p className="text-sm text-gray-600 mt-1">
-            Margin: {((totalProfit / totalSales) * 100).toFixed(1)}%
-          </p>
+        <Card className="p-4">
+          <h3 className="text-sm font-medium text-gray-500">Units Sold (30d)</h3>
+          <p className="text-2xl font-bold">{analytics?.totalQuantity || 0}</p>
         </Card>
-
-        <Card className="p-6">
-          <h3 className="text-sm font-medium text-gray-500">Jumlah Produk Terjual</h3>
-          <p className="text-2xl font-bold mt-2">{totalQuantity} unit</p>
-          <p className="text-sm text-gray-600 mt-1">
-            Rata-rata: {(totalQuantity / sales.length).toFixed(1)} per transaksi
-          </p>
-        </Card>
-
-        <Card className="p-6">
-          <h3 className="text-sm font-medium text-gray-500">Rata-rata Order</h3>
-          <p className="text-2xl font-bold mt-2">{formatRupiah(averageOrderValue)}</p>
-          <p className="text-sm text-gray-600 mt-1">Per transaksi</p>
+        <Card className="p-4">
+          <h3 className="text-sm font-medium text-gray-500">Avg. Order Value</h3>
+          <p className="text-2xl font-bold">{formatRupiah(analytics?.averageOrderValue || 0)}</p>
         </Card>
       </div>
 
-      {/* Sales Chart */}
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4">Grafik Penjualan</h3>
-        <SalesChart />
+      {/* New Sale Form */}
+      <Card className="p-4 mb-6">
+        <form onSubmit={handleCreateSale} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <Label htmlFor="product">Product</Label>
+            <select
+              id="product"
+              value={selectedProduct}
+              onChange={(e) => setSelectedProduct(e.target.value)}
+              className="w-full p-2 border rounded"
+              required
+            >
+              <option value="">Select a product</option>
+              {products.map((product) => (
+                <option key={product.id} value={product.id}>
+                  {product.name} - {formatRupiah(product.price)}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <Label htmlFor="quantity">Quantity</Label>
+            <Input
+              id="quantity"
+              type="number"
+              min="1"
+              value={quantity}
+              onChange={(e) => setQuantity(e.target.value)}
+              required
+            />
+          </div>
+          <div className="flex items-end">
+            <Button type="submit" className="w-full">
+              Record Sale
+            </Button>
+          </div>
+        </form>
       </Card>
 
       {/* Sales Table */}
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4">Detail Penjualan</h3>
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Tanggal</TableHead>
-                <TableHead>Produk</TableHead>
-                <TableHead>Jumlah</TableHead>
-                <TableHead>Harga</TableHead>
-                <TableHead>Total</TableHead>
-                <TableHead>Profit</TableHead>
-                <TableHead className="text-right">Aksi</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+      <Card className="p-4">
+        <h2 className="text-lg font-semibold mb-4">Recent Sales</h2>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b">
+                <th className="text-left p-2">Date</th>
+                <th className="text-left p-2">Product</th>
+                <th className="text-left p-2">Quantity</th>
+                <th className="text-left p-2">Total</th>
+                <th className="text-left p-2">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
               {sales.map((sale) => (
-                <TableRow key={sale.id}>
-                  <TableCell>{new Date(sale.date).toLocaleDateString('id-ID')}</TableCell>
-                  <TableCell>{sale.productName}</TableCell>
-                  <TableCell>{sale.quantity}</TableCell>
-                  <TableCell>{formatRupiah(sale.price)}</TableCell>
-                  <TableCell>{formatRupiah(sale.total)}</TableCell>
-                  <TableCell>{formatRupiah(sale.profit)}</TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="outline" size="sm">
-                      Detail
+                <tr key={sale.id} className="border-b">
+                  <td className="p-2">
+                    {new Date(sale.date).toLocaleDateString()}
+                  </td>
+                  <td className="p-2">{sale.product?.name}</td>
+                  <td className="p-2">{sale.quantity}</td>
+                  <td className="p-2">{formatRupiah(sale.total)}</td>
+                  <td className="p-2">
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => handleDeleteSale(sale.id)}
+                    >
+                      Delete
                     </Button>
-                  </TableCell>
-                </TableRow>
+                  </td>
+                </tr>
               ))}
-              {sales.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-4">
-                    Belum ada data penjualan untuk periode ini.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+            </tbody>
+          </table>
         </div>
-      </Card>
-
-      {/* Product Performance */}
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4">Performa Produk</h3>
-        <ProductPerformanceChart />
       </Card>
     </div>
   )

@@ -3,64 +3,85 @@ import { PrismaClient } from '@prisma/client'
 const prisma = new PrismaClient()
 
 async function main() {
-  try {
-    // Create initial categories
-    const categories = await prisma.category.createMany({
-      data: [
-        { name: 'Parfum Pria' },
-        { name: 'Parfum Wanita' },
-        { name: 'Parfum Unisex' },
-      ],
-      skipDuplicates: true,
-    })
+  // Clear existing data
+  await prisma.sale.deleteMany()
+  await prisma.product.deleteMany()
+  await prisma.category.deleteMany()
 
-    // Create admin user
-    const admin = await prisma.user.upsert({
-      where: { email: 'admin@example.com' },
-      update: {},
-      create: {
-        email: 'admin@example.com',
-        name: 'Admin',
-        password: 'admin123', // In production, use hashed password
-        role: 'ADMIN',
+  // Create categories
+  const parfumPria = await prisma.category.create({
+    data: { name: 'Parfum Pria' },
+  })
+  const parfumWanita = await prisma.category.create({
+    data: { name: 'Parfum Wanita' },
+  })
+  const parfumUnisex = await prisma.category.create({
+    data: { name: 'Parfum Unisex' },
+  })
+
+  // Create products
+  const blueDeChanel = await prisma.product.create({
+    data: {
+      name: 'Blue de Chanel',
+      description: 'Aroma woody dan citrus yang maskulin',
+      price: 1500000,
+      stock: 50,
+      categoryId: parfumPria.id,
+    },
+  })
+
+  const missDior = await prisma.product.create({
+    data: {
+      name: 'Miss Dior',
+      description: 'Aroma floral yang feminin dan elegan',
+      price: 1800000,
+      stock: 40,
+      categoryId: parfumWanita.id,
+    },
+  })
+
+  const ckOne = await prisma.product.create({
+    data: {
+      name: 'CK One',
+      description: 'Aroma segar dan ringan untuk semua gender',
+      price: 1200000,
+      stock: 60,
+      categoryId: parfumUnisex.id,
+    },
+  })
+
+  // Create sales
+  await prisma.sale.createMany({
+    data: [
+      {
+        productId: blueDeChanel.id,
+        quantity: 2,
+        total: 3000000,
+        date: new Date(),
       },
-    })
+      {
+        productId: missDior.id,
+        quantity: 1,
+        total: 1800000,
+        date: new Date(),
+      },
+      {
+        productId: ckOne.id,
+        quantity: 3,
+        total: 3600000,
+        date: new Date(),
+      },
+    ],
+  })
 
-    // Create sample products
-    const products = await prisma.product.createMany({
-      data: [
-        {
-          name: 'Blue de Chanel',
-          description: 'A woody aromatic fragrance for men',
-          price: 1500000,
-          stock: 10,
-          categoryId: 1,
-        },
-        {
-          name: 'Miss Dior',
-          description: 'A floral fragrance for women',
-          price: 1800000,
-          stock: 8,
-          categoryId: 2,
-        },
-        {
-          name: 'CK One',
-          description: 'A citrus aromatic fragrance for everyone',
-          price: 1200000,
-          stock: 15,
-          categoryId: 3,
-        },
-      ],
-      skipDuplicates: true,
-    })
-
-    console.log('Database initialized with sample data')
-  } catch (error) {
-    console.error('Error initializing database:', error)
-    process.exit(1)
-  } finally {
-    await prisma.$disconnect()
-  }
+  console.log('Database seeded successfully')
 }
 
 main()
+  .catch((e) => {
+    console.error(e)
+    process.exit(1)
+  })
+  .finally(async () => {
+    await prisma.$disconnect()
+  })

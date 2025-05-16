@@ -1,131 +1,146 @@
 "use client"
 
-import { useState } from "react"
-import { Button } from "@/components/ui/button"
-import { Card } from "@/components/ui/card"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import { formatRupiah } from "@/lib/product-utils"
+import React, { useEffect, useState } from "react"
+import { Product, Category } from "@prisma/client"
 import ProductForm from "./ProductForm"
 
-// Dummy data untuk contoh
-const dummyProducts = [
-  {
-    id: 1,
-    name: "Parfum A",
-    category: "Extrait de Parfume",
-    volume: 50,
-    concentration: 20,
-    hpp: 150000,
-    sellingPrice: 300000,
-  },
-  {
-    id: 2,
-    name: "Parfum B",
-    category: "Extrait de Parfume",
-    volume: 100,
-    concentration: 25,
-    hpp: 250000,
-    sellingPrice: 500000,
-  },
-]
+interface ProductWithRelations extends Product {
+  category?: Category | null
+}
 
-export default function ProductPage() {
-  const [showForm, setShowForm] = useState(false)
-  const [products] = useState(dummyProducts)
+export default function ProductDashboard() {
+  const [products, setProducts] = useState<ProductWithRelations[]>([])
+  const [categories, setCategories] = useState<Category[]>([])
+  const [loading, setLoading] = useState<boolean>(true)
+  const [error, setError] = useState<string | null>(null)
+  const [editingProduct, setEditingProduct] = useState<ProductWithRelations | null>(null)
+  const [showForm, setShowForm] = useState<boolean>(false)
+
+  const fetchProducts = async () => {
+    setLoading(true)
+    try {
+      const res = await fetch("/api/products")
+      if (!res.ok) throw new Error("Failed to fetch products")
+      const data = await res.json()
+      setProducts(data)
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const fetchCategories = async () => {
+    try {
+      const res = await fetch("/api/categories")
+      if (!res.ok) throw new Error("Failed to fetch categories")
+      const data = await res.json()
+      setCategories(data)
+    } catch (err: any) {
+      setError(err.message)
+    }
+  }
+
+  useEffect(() => {
+    fetchProducts()
+    fetchCategories()
+  }, [])
+
+  const handleEdit = (product: ProductWithRelations) => {
+    setEditingProduct(product)
+    setShowForm(true)
+  }
+
+  const handleDelete = async (id: number) => {
+    if (!confirm("Are you sure you want to delete this product?")) return
+    try {
+      const res = await fetch(`/api/products?id=${id}`, { method: "DELETE" })
+      if (!res.ok) throw new Error("Failed to delete product")
+      await fetchProducts()
+    } catch (err: any) {
+      setError(err.message)
+    }
+  }
+
+  const handleFormClose = () => {
+    setEditingProduct(null)
+    setShowForm(false)
+  }
+
+  const handleFormSubmit = async (formData: any) => {
+    try {
+      const method = editingProduct ? "PUT" : "POST"
+      const url = editingProduct ? `/api/products?id=${editingProduct.id}` : "/api/products"
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(formData),
+      })
+      if (!res.ok) throw new Error("Failed to save product")
+      await fetchProducts()
+      handleFormClose()
+    } catch (err: any) {
+      setError(err.message)
+    }
+  }
 
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h2 className="text-2xl font-bold">Manajemen Produk & HPP</h2>
-        <Button onClick={() => setShowForm(!showForm)}>
-          {showForm ? "Tutup Form" : "Tambah Produk"}
-        </Button>
-      </div>
-
-      {showForm && (
-        <Card className="p-6">
-          <ProductForm />
-        </Card>
+    <div className="p-4">
+      <h1 className="text-2xl font-bold mb-4">Product Dashboard</h1>
+      {error && <div className="text-red-600 mb-4">{error}</div>}
+      <button
+        className="mb-4 rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700"
+        onClick={() => setShowForm(true)}
+      >
+        Add Product
+      </button>
+      {loading ? (
+        <div>Loading...</div>
+      ) : (
+        <table className="w-full border-collapse border border-gray-300">
+          <thead>
+            <tr>
+              <th className="border border-gray-300 px-4 py-2">Name</th>
+              <th className="border border-gray-300 px-4 py-2">Category</th>
+              <th className="border border-gray-300 px-4 py-2">Price</th>
+              <th className="border border-gray-300 px-4 py-2">Stock</th>
+              <th className="border border-gray-300 px-4 py-2">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {products.map((product) => (
+              <tr key={product.id}>
+                <td className="border border-gray-300 px-4 py-2">{product.name}</td>
+                <td className="border border-gray-300 px-4 py-2">{product.category?.name || "-"}</td>
+                <td className="border border-gray-300 px-4 py-2">{product.price}</td>
+                <td className="border border-gray-300 px-4 py-2">{product.stock}</td>
+                <td className="border border-gray-300 px-4 py-2">
+                  <button
+                    className="mr-2 rounded bg-yellow-500 px-2 py-1 text-white hover:bg-yellow-600"
+                    onClick={() => handleEdit(product)}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    className="rounded bg-red-600 px-2 py-1 text-white hover:bg-red-700"
+                    onClick={() => handleDelete(product.id)}
+                  >
+                    Delete
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       )}
-
-      <Card className="p-6">
-        <h3 className="text-lg font-semibold mb-4">Daftar Produk</h3>
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nama Produk</TableHead>
-                <TableHead>Kategori</TableHead>
-                <TableHead>Volume (ml)</TableHead>
-                <TableHead>Konsentrasi (%)</TableHead>
-                <TableHead>HPP</TableHead>
-                <TableHead>Harga Jual</TableHead>
-                <TableHead className="text-right">Aksi</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {products.map((product) => (
-                <TableRow key={product.id}>
-                  <TableCell>{product.name}</TableCell>
-                  <TableCell>{product.category}</TableCell>
-                  <TableCell>{product.volume}</TableCell>
-                  <TableCell>{product.concentration}%</TableCell>
-                  <TableCell>{formatRupiah(product.hpp)}</TableCell>
-                  <TableCell>{formatRupiah(product.sellingPrice)}</TableCell>
-                  <TableCell className="text-right">
-                    <div className="space-x-2">
-                      <Button variant="outline" size="sm">
-                        Edit
-                      </Button>
-                      <Button variant="destructive" size="sm">
-                        Hapus
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {products.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={7} className="text-center py-4">
-                    Belum ada produk. Klik "Tambah Produk" untuk menambahkan produk baru.
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      </Card>
-
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="p-6">
-          <h3 className="text-sm font-medium text-gray-500">Total Produk</h3>
-          <p className="text-2xl font-bold mt-2">{products.length}</p>
-        </Card>
-        <Card className="p-6">
-          <h3 className="text-sm font-medium text-gray-500">Rata-rata HPP</h3>
-          <p className="text-2xl font-bold mt-2">
-            {formatRupiah(
-              products.reduce((acc, curr) => acc + curr.hpp, 0) / products.length || 0
-            )}
-          </p>
-        </Card>
-        <Card className="p-6">
-          <h3 className="text-sm font-medium text-gray-500">Rata-rata Harga Jual</h3>
-          <p className="text-2xl font-bold mt-2">
-            {formatRupiah(
-              products.reduce((acc, curr) => acc + curr.sellingPrice, 0) / products.length || 0
-            )}
-          </p>
-        </Card>
-      </div>
+      {showForm && (
+        <ProductForm
+          product={editingProduct}
+          categories={categories}
+          onClose={handleFormClose}
+          onSubmit={handleFormSubmit}
+        />
+      )}
     </div>
   )
 }

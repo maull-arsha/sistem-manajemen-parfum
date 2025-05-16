@@ -1,108 +1,108 @@
 "use client"
 
-import ChartComponent from "@/components/ui/chart-component"
-import { generateProductPerformanceChart } from "@/lib/chart-utils"
+import React from "react"
+import { Card } from "@/components/ui/card"
+import { Sale } from "@/types"
+import { formatRupiah } from "@/lib/utils"
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts"
 
-// Dummy data untuk contoh
-const dummyProductData = [
-  {
-    name: "Parfum A",
-    quantity: 45,
-    revenue: 13500000,
-  },
-  {
-    name: "Parfum B",
-    quantity: 32,
-    revenue: 16000000,
-  },
-  {
-    name: "Parfum C",
-    quantity: 28,
-    revenue: 8400000,
-  },
-  {
-    name: "Parfum D",
-    quantity: 20,
-    revenue: 10000000,
-  },
-  {
-    name: "Parfum E",
-    quantity: 15,
-    revenue: 7500000,
-  },
-]
+interface ProductPerformanceChartProps {
+  sales: Sale[]
+}
 
-export default function ProductPerformanceChart() {
-  const chartData = generateProductPerformanceChart(dummyProductData)
+interface ProductPerformance {
+  name: string
+  totalSales: number
+  totalQuantity: number
+}
 
-  const options = {
-    responsive: true,
-    plugins: {
-      legend: {
-        position: 'bottom' as const,
-      },
-      title: {
-        display: true,
-        text: 'Performa Produk',
-      },
-    },
-    scales: {
-      y: {
-        beginAtZero: true,
-        title: {
-          display: true,
-          text: 'Jumlah Terjual'
-        }
+export default function ProductPerformanceChart({ sales }: ProductPerformanceChartProps) {
+  // Process sales data for product performance
+  const productPerformance = sales.reduce((acc: { [key: string]: ProductPerformance }, sale) => {
+    const productName = sale.product?.name || "Unknown Product"
+    
+    if (!acc[productName]) {
+      acc[productName] = {
+        name: productName,
+        totalSales: 0,
+        totalQuantity: 0,
       }
     }
-  }
+    
+    acc[productName].totalSales += sale.total
+    acc[productName].totalQuantity += sale.quantity
+    
+    return acc
+  }, {})
+
+  const chartData = Object.values(productPerformance)
+    .sort((a, b) => b.totalSales - a.totalSales)
+    .slice(0, 10) // Top 10 products
 
   return (
-    <div className="space-y-4">
-      <div>
-        <ChartComponent
-          type="bar"
-          data={chartData}
-          options={options}
-          height={300}
-        />
+    <Card className="p-4">
+      <h3 className="text-lg font-semibold mb-4">Top 10 Products by Sales</h3>
+      <div className="h-[300px]">
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={chartData} layout="vertical">
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis
+              type="number"
+              tick={{ fontSize: 12 }}
+              tickFormatter={(value) => formatRupiah(value).split(",")[0]}
+            />
+            <YAxis
+              type="category"
+              dataKey="name"
+              tick={{ fontSize: 12 }}
+              width={150}
+            />
+            <Tooltip
+              formatter={(value: number) => [formatRupiah(value), "Total Sales"]}
+              cursor={{ fill: "rgba(0, 0, 0, 0.1)" }}
+            />
+            <Bar
+              dataKey="totalSales"
+              fill="#2563eb"
+              radius={[0, 4, 4, 0]}
+            />
+          </BarChart>
+        </ResponsiveContainer>
       </div>
       
-      {/* Top Products Table */}
-      <div className="mt-4">
-        <h4 className="text-sm font-medium text-gray-500 mb-2">Top 5 Produk Terlaris</h4>
-        <div className="border rounded-lg divide-y">
-          {dummyProductData
-            .sort((a, b) => b.quantity - a.quantity)
-            .slice(0, 5)
-            .map((product, index) => (
-              <div
-                key={product.name}
-                className="flex items-center justify-between p-3"
-              >
-                <div className="flex items-center space-x-3">
-                  <span className="text-sm font-medium text-gray-500">
-                    #{index + 1}
-                  </span>
-                  <span className="font-medium">{product.name}</span>
-                </div>
-                <div className="text-right">
-                  <div className="text-sm font-medium">
-                    {product.quantity} unit
-                  </div>
-                  <div className="text-sm text-gray-500">
-                    {new Intl.NumberFormat('id-ID', {
-                      style: 'currency',
-                      currency: 'IDR',
-                      minimumFractionDigits: 0,
-                      maximumFractionDigits: 0,
-                    }).format(product.revenue)}
-                  </div>
-                </div>
-              </div>
+      {/* Product Performance Table */}
+      <div className="mt-4 overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b">
+              <th className="text-left p-2">Product</th>
+              <th className="text-right p-2">Units Sold</th>
+              <th className="text-right p-2">Total Sales</th>
+              <th className="text-right p-2">Avg. Price</th>
+            </tr>
+          </thead>
+          <tbody>
+            {chartData.map((product) => (
+              <tr key={product.name} className="border-b">
+                <td className="p-2">{product.name}</td>
+                <td className="text-right p-2">{product.totalQuantity}</td>
+                <td className="text-right p-2">{formatRupiah(product.totalSales)}</td>
+                <td className="text-right p-2">
+                  {formatRupiah(product.totalSales / product.totalQuantity)}
+                </td>
+              </tr>
             ))}
-        </div>
+          </tbody>
+        </table>
       </div>
-    </div>
+    </Card>
   )
 }
